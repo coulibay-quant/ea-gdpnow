@@ -1,0 +1,158 @@
+# Series and block configuration for the nowcast.
+# All series come from the Eurostat dissemination API (JSON-stat, no key required).
+# Checked on 2026-10-15 for geo = EA21 (euro area, 21 countries, Bulgaria included).
+
+[general]
+geo = "EA21"
+start_quarter = "2000Q1"          # start of the estimation sample
+gdp_release_lag_days = 30          # preliminary flash estimate, t+30
+components_release_lag_days = 65   # full release with expenditure components, ~t+65
+# Quarters dropped from estimation (Covid). Set to [] to keep everything.
+exclude_quarters = ["2020Q1", "2020Q2", "2020Q3", "2020Q4", "2021Q1", "2021Q2"]
+
+# ---------------------------------------------------------------------------
+# Quarterly national accounts (namq_10_gdp)
+# growth: CLV_PCH_PRE = chain-linked volumes, % change on previous period, SCA
+# level : CP_MEUR     = current prices, million euro (used for the weights)
+# ---------------------------------------------------------------------------
+[national_accounts]
+dataset = "namq_10_gdp"
+growth_unit = "CLV_PCH_PRE"
+# Growth is recomputed from chain-linked volume levels (more precise than CLV_PCH_PRE,
+# which is rounded to one decimal). The first available code is used; growth rates are
+# identical whatever the reference year.
+volume_level_units = ["CLV20_MEUR", "CLV15_MEUR", "CLV10_MEUR"]
+level_unit = "CP_MEUR"
+s_adj = "SCA"
+gdp_item = "B1GQ"
+
+# ---------------------------------------------------------------------------
+# Monthly indicators
+# transform:
+#   "pct"   -> index: quarterly average, then % change on previous quarter
+#   "level" -> survey balance: quarterly average of the balance
+# release_lag_days: approximate delay between the end of the reference month and
+#   publication (used to rebuild the ragged edge in pseudo real time).
+# ---------------------------------------------------------------------------
+[indicators.retail_volume]
+label = "Retail trade volume"
+dataset = "sts_trtu_m"
+filters = { indic_bt = "VOL_SLS", nace_r2 = "G47", s_adj = "SCA", unit = "I21" }
+transform = "pct"
+release_lag_days = 36
+
+[indicators.ip_total]
+label = "Industrial production (B-D)"
+dataset = "sts_inpr_m"
+filters = { indic_bt = "PRD", nace_r2 = "B-D", s_adj = "SCA", unit = "I21" }
+transform = "pct"
+release_lag_days = 45
+
+[indicators.ip_capital_goods]
+label = "Capital goods production"
+dataset = "sts_inpr_m"
+filters = { indic_bt = "PRD", nace_r2 = "MIG_CAG", s_adj = "SCA", unit = "I21" }
+transform = "pct"
+release_lag_days = 45
+
+[indicators.construction]
+label = "Construction output"
+dataset = "sts_copr_m"
+filters = { indic_bt = "PRD", nace_r2 = "F", s_adj = "SCA", unit = "I21" }
+transform = "pct"
+release_lag_days = 52
+
+[indicators.esi]
+label = "Economic sentiment indicator"
+dataset = "ei_bssi_m_r2"
+filters = { indic = "BS-ESI-I", s_adj = "SA" }
+transform = "level"
+release_lag_days = 0
+
+[indicators.consumer_conf]
+label = "Consumer confidence"
+dataset = "ei_bssi_m_r2"
+filters = { indic = "BS-CSMCI-BAL", s_adj = "SA" }
+transform = "level"
+release_lag_days = 0
+
+[indicators.retail_conf]
+label = "Retail trade confidence"
+dataset = "ei_bssi_m_r2"
+filters = { indic = "BS-RCI-BAL", s_adj = "SA" }
+transform = "level"
+release_lag_days = 0
+
+[indicators.construction_conf]
+label = "Construction confidence"
+dataset = "ei_bssi_m_r2"
+filters = { indic = "BS-CCI-BAL", s_adj = "SA" }
+transform = "level"
+release_lag_days = 0
+
+[indicators.export_orders]
+label = "Export order books"
+dataset = "ei_bsin_m_r2"
+filters = { indic = "BS-IEOB", s_adj = "SA" }
+transform = "level"
+release_lag_days = 0
+
+[indicators.stocks_finished]
+label = "Stocks of finished products (assessment)"
+dataset = "ei_bsin_m_r2"
+filters = { indic = "BS-ISFP", s_adj = "SA" }
+transform = "level"
+release_lag_days = 0
+
+# ---------------------------------------------------------------------------
+# Demand blocks, estimated in this order (a block may use the forecast growth of a
+# block defined earlier: "block:<name>").
+# model = "bridge": block growth ~ same-quarter indicators (+ AR(1) term if ar_lag)
+# model = "ar"    : AR(1) on block growth
+# The "residual" block absorbs the change in inventories and the aggregation gap:
+#   residual_t = GDP_t - sum(weight_i * growth_i); it is modelled in GDP percentage points.
+# ---------------------------------------------------------------------------
+[blocks.consumption]
+label = "Household consumption"
+na_item = "P31_S14_S15"
+sign = 1
+model = "bridge"
+regressors = ["retail_volume", "consumer_conf", "retail_conf"]
+ar_lag = false
+
+[blocks.government]
+label = "Government consumption"
+na_item = "P3_S13"
+sign = 1
+model = "ar"
+
+[blocks.investment]
+label = "Investment (GFCF)"
+na_item = "P51G"
+sign = 1
+model = "bridge"
+regressors = ["construction", "ip_capital_goods", "construction_conf"]
+ar_lag = false
+
+[blocks.exports]
+label = "Exports"
+na_item = "P6"
+sign = 1
+model = "bridge"
+regressors = ["ip_total", "export_orders"]
+ar_lag = false
+
+[blocks.imports]
+label = "Imports"
+na_item = "P7"
+sign = -1
+model = "bridge"
+regressors = ["block:consumption", "block:investment", "block:exports"]
+ar_lag = false
+
+[blocks.residual]
+label = "Inventories and aggregation gap"
+sign = 1
+model = "bridge"
+regressors = ["stocks_finished"]
+ar_lag = true
