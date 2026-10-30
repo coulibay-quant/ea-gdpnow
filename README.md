@@ -8,6 +8,22 @@ indicators, and the components are then re-aggregated into contributions to grow
 100% public data (Eurostat API, no key required). Every download is timestamped in a SQLite
 database, so true data vintages build up over time.
 
+## Key results (data as of 30 October 2026)
+
+**Full commented results, with charts and the estimated equations: [RESULTS.md](RESULTS.md).**
+
+- **First real-time test, 2026Q3:** nowcast of +0.18% q/q saved on 26 October; Eurostat flash on
+  30 October: +0.4% (consensus about +0.2%). Most of the gap comes from Ireland (+5.5% q/q, roughly
+  +0.2 point of euro area growth).
+- **Pseudo-real-time backtest, 2010Q1–2026Q2** (60 quarters, Covid excluded): the error falls from
+  0.36 to 0.27 pp as data come in; 25 days after quarter end the model beats an AR(2) on GDP by 17%
+  (Diebold-Mariano p = 0.04).
+- **Since 2021** it holds up much better than a direct GDP bridge (RMSFE 0.29 vs 0.39 pp).
+- **Next step:** combine the equations with an anchor model early in the quarter, and treat Ireland
+  separately.
+
+![2026Q3 nowcast in pseudo real time](docs/track_2026Q3.png)
+
 ## Pipeline
 
 ```
@@ -93,34 +109,6 @@ AR(2), Diebold-Mariano test) and `outputs/error_by_component.csv` (contribution 
 Higgins' table 6). Quarters 2020Q1–2021Q2 are excluded from estimation (configurable) and, by
 default, from the scores (`--keep-excluded` to score them); `outputs/backtest.csv` keeps every
 quarter.
-
-## Results (data as of 30 October 2026)
-
-**Pseudo-real-time backtest, 2010Q1–2026Q2** (60 quarters, 2020Q1–2021Q2 excluded). RMSFE in
-percentage points of quarter-on-quarter GDP growth:
-
-| Horizon | Components | AR(2) | Direct GDP bridge | Components / AR(2) |
-| --- | --- | --- | --- | --- |
-| 60 days before quarter end | 0.357 | 0.338 | 0.366 | 1.06 |
-| 30 days before quarter end | 0.347 | 0.321 | 0.345 | 1.08 |
-| Quarter end | 0.286 | 0.321 | 0.303 | 0.89 |
-| 25 days after quarter end | **0.268** | 0.321 | 0.291 | **0.83** (Diebold-Mariano p = 0.04) |
-
-- Accuracy improves as monthly data come in; late in the quarter the component model beats the
-  AR(2) benchmark significantly.
-- Since 2021 it holds up much better than a direct GDP bridge (RMSFE 0.29 vs 0.39 at 25 days after
-  quarter end).
-- Early in the quarter it does not beat the AR(2): combining it with an anchor model, with a weight
-  that depends on the information available (as GDPNow does), is the next step.
-- The largest component errors come from investment and imports (Irish intellectual-property
-  flows); they largely offset each other in GDP.
-
-**First real-time test, 2026Q3.** Nowcast saved on 26 October 2026: **+0.18%** q/q. Eurostat
-preliminary flash on 30 October: **+0.4%** (+0.42% unrounded), against a consensus of about +0.2%.
-Most of the gap comes from Ireland (+5.5% q/q, roughly +0.2 point of euro area growth), which no
-euro area monthly indicator captures.
-
-![2026Q3 nowcast in pseudo real time](docs/track_2026Q3.png)
 
 ## Project structure
 
